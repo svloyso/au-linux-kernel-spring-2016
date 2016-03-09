@@ -26,8 +26,8 @@ static void __init test_stack(void)
     for (i = ARRAY_SIZE(test_data) - 1; i >= 0; --i) {
         tos = stack_pop(&data_stack);
         tos_data = STACK_ENTRY_DATA(tos, const char*);
-        delete_stack_entry(tos);
         printk(KERN_ALERT "%s == %s\n", tos_data, test_data[i]);
+        delete_stack_entry(tos);
         assert(!strcmp(tos_data, test_data[i]));
     }
 
@@ -36,7 +36,29 @@ static void __init test_stack(void)
 
 static void __init print_processes_backwards(void)
 {
-    // TODO
+    LIST_HEAD(proc_stack);
+    stack_entry_t *ent = NULL;
+    char* proc_name = NULL;
+    struct task_struct *task;
+    for_each_process(task) {
+        proc_name = kmalloc(255, GFP_KERNEL);
+        if(!proc_name) {
+            break;
+        }
+        get_task_comm(proc_name, task);
+        ent = create_stack_entry((void*)proc_name);
+        if(!ent) {
+            break;
+        }
+        stack_push(&proc_stack, ent);
+    }
+    while(!list_empty(&proc_stack)) {
+        ent = stack_pop(&proc_stack);
+        proc_name = STACK_ENTRY_DATA(ent, char*);
+        pr_alert("%s\n", proc_name);
+        kfree(proc_name);
+        delete_stack_entry(ent);
+    }
 }
 
 static int __init ll_init(void)
