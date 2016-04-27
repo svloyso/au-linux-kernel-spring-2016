@@ -78,12 +78,17 @@ static ssize_t vsd_dev_write(char *src, size_t src_size, size_t offset) {
 
 static void vsd_dev_set_size(size_t size)
 {
-    // TODO implement command
-    // if size > VSD size then return -EINVAL to vsd_driver
-    // Don't forget to wake vsd_driver up using tasklet.
-    // Ensure that woken up task observes your writes
-    // to shared memory (hwregs).
-    // If new size is > current size then return -EINVAL.
+    dev.hwregs->result = -EINVAL;
+
+    if(size <= dev.buf_size) {
+        dev.hwregs->dev_size = dev.buf_size = size;
+        dev.hwregs->result = 0;
+    }
+    dev.hwregs->cmd = VSD_CMD_NONE;
+    wmb();
+
+    if(dev.hwregs->tasklet_vaddr) 
+        tasklet_schedule((void*)dev.hwregs->tasklet_vaddr);
 }
 
 static void vsd_dev_cmd_rw_after(ssize_t ret)
@@ -122,8 +127,7 @@ static int vsd_dev_cmd_poll_kthread_func(void *data)
                 vsd_dev_cmd_rw_after(ret);
                 break;
             case VSD_CMD_SET_SIZE:
-                // TODO call vsd_dev_set_size
-                // with right arguments
+                vsd_dev_set_size(dev.hwregs->dev_offset);
                 break;
         }
 
